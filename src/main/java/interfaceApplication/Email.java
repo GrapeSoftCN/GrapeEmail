@@ -53,7 +53,7 @@ public class Email {
 		session session = new session();
 		session.setget("emailCode", object.toString());
 		sRedis.setExpire("emailCode", 5 * 60);
-		return model.resultMessage(model.send(id, object), "发送成功");
+		return model.resultMessage(model.send(id, object), "验证码发送成功");
 	}
 
 	// 验证用户输入的邮箱验证码
