@@ -7,9 +7,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
+import org.bson.types.ObjectId;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
+import apps.appsProxy;
 import email.emailhost;
 import email.mail;
 import esayhelper.DBHelper;
@@ -23,6 +25,8 @@ public class EmailModel {
 	private JSONObject _obj = new JSONObject();
 
 	static {
+//		JSONObject object = appsProxy.configValue();
+//		emails = new DBHelper(object.get("db").toString(), "emailhost");
 		emails = new DBHelper("mysql", "emailhost");
 		form = emails.getChecker();
 	}
@@ -93,7 +97,14 @@ public class EmailModel {
 
 	@SuppressWarnings("unchecked")
 	public String page(int idx, int pageSize, JSONObject info) {
-		JSONArray array = emails.page(idx, pageSize);
+		for (Object object2 : info.keySet()) {
+			if (info.containsKey("_id")) {
+				emails.eq("_id",
+						new ObjectId(info.get("_id").toString()));
+			}
+			emails.like(object2.toString(), info.get(object2.toString()));
+		}
+		JSONArray array = emails.dirty().page(idx, pageSize);
 		JSONObject object = new JSONObject();
 		object.put("totalSize",
 				(int) Math.ceil((double) emails.count() / pageSize));
