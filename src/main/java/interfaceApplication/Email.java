@@ -44,13 +44,16 @@ public class Email {
 	// 用户注册网站，激活邮箱
 	@SuppressWarnings("unchecked")
 	public String ActiveEmail(String id, String email) {
+		session session = new session();
+		if (session.get("emailCode")!=null) {
+			return model.resultMessage(7, "");
+		}
 		redis sRedis = new redis("redis");
 		String num = model.getValiCode(); // 获取6位随机数
 		JSONObject object = new JSONObject();
 		object.put("subject", "注册网站的验证邮件");
 		object.put("email", email);
 		object.put("code", num);
-		session session = new session();
 		session.setget("emailCode", object.toString());
 		sRedis.setExpire("emailCode", 5 * 60);
 		return model.resultMessage(model.send(id, object), "验证码发送成功");

@@ -25,9 +25,9 @@ public class EmailModel {
 	private JSONObject _obj = new JSONObject();
 
 	static {
-//		JSONObject object = appsProxy.configValue();
-//		emails = new DBHelper(object.get("db").toString(), "emailhost");
-		emails = new DBHelper("mysql", "emailhost");
+		emails = new DBHelper(appsProxy.configValue().get("db").toString(),
+				"emailhost");
+//		 emails = new DBHelper("localdb", "emailhost");
 		form = emails.getChecker();
 	}
 
@@ -52,7 +52,8 @@ public class EmailModel {
 			return resultMessage(3, "");
 		}
 		if (info.containsKey("ownid")) {
-			ownid = info.get("ownid").toString();
+			info.remove("ownid");
+			ownid = String.valueOf(appsProxy.appid());
 		}
 		String tips = emailhost.addHost(ownid, info.get("userid").toString(),
 				info.get("password").toString(), info.get("smtp").toString(),
@@ -80,6 +81,9 @@ public class EmailModel {
 				return 2;
 			}
 		}
+		if (info.containsKey("time")) {
+			info.remove("time");
+		}
 		return emailhost.editHost(Integer.parseInt(id), info) == true ? 0 : 99;
 	}
 
@@ -99,8 +103,7 @@ public class EmailModel {
 	public String page(int idx, int pageSize, JSONObject info) {
 		for (Object object2 : info.keySet()) {
 			if (info.containsKey("_id")) {
-				emails.eq("_id",
-						new ObjectId(info.get("_id").toString()));
+				emails.eq("_id", new ObjectId(info.get("_id").toString()));
 			}
 			emails.like(object2.toString(), info.get(object2.toString()));
 		}
@@ -116,12 +119,25 @@ public class EmailModel {
 
 	// 发送消息，包含字段：发件人信息，收件人邮箱，抄送人，邮件主题，邮件正文，附件内容
 	@SuppressWarnings("unchecked")
-	public int send(String id, JSONObject object) {
+	public int send(String ownid, JSONObject object) {
+		ownid = String.valueOf(appsProxy.appid());
+		String id = search(ownid).get("id").toString();
 		boolean flag = false;
 		String CC = "";
+		String subject = "";
+		String content = "";
 		List<String> list = new ArrayList<String>();
 		if (!object.containsKey("to")) {
 			return 4;
+		}
+		if (!checkEmail(object.get("to").toString())) {
+			return 2;
+		}
+		if (object.containsKey("subject")) {
+			subject = object.get("subject").toString();
+		}
+		if (object.containsKey("content")) {
+			content = object.get("content").toString();
 		}
 		if (object.containsKey("cc")) {
 			CC = object.get("cc").toString();
@@ -130,9 +146,7 @@ public class EmailModel {
 			list = (List<String>) object.get("attachments");
 		}
 		mail mails = mail.defaultEntity(Integer.parseInt(id),
-				object.get("to").toString(), CC,
-				object.get("subject").toString(),
-				object.get("content").toString(), list);
+				object.get("to").toString(), CC,subject,content, list);
 		try {
 			flag = mails.send();
 		} catch (Exception e) {
@@ -144,6 +158,11 @@ public class EmailModel {
 	// 根据id查找email
 	public JSONObject find(String id) {
 		return emails.eq("id", id).find();
+	}
+
+	// 根据ownid查找email
+	public JSONObject search(String ownid) {
+		return emails.eq("ownid", ownid).find();
 	}
 
 	// 邮箱格式是否存在
@@ -221,6 +240,9 @@ public class EmailModel {
 			break;
 		case 6:
 			msg = "验证码输入错误";
+			break;
+		case 7:
+			msg = "有效时间内，请勿重复获取验证码";
 			break;
 		default:
 			msg = "其他操作错误";
