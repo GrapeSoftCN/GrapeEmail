@@ -17,6 +17,7 @@ import email.mail;
 import esayhelper.DBHelper;
 import esayhelper.formHelper;
 import esayhelper.formHelper.formdef;
+import nlogger.nlogger;
 import esayhelper.jGrapeFW_Message;
 
 public class EmailModel {
@@ -25,9 +26,8 @@ public class EmailModel {
 	private JSONObject _obj = new JSONObject();
 
 	static {
-		emails = new DBHelper(appsProxy.configValue().get("db").toString(),
-				"emailhost");
-//		 emails = new DBHelper("localdb", "emailhost");
+		System.out.println(appsProxy.configValue());
+		emails = new DBHelper(appsProxy.configValue().get("db").toString(), "emailhost");
 		form = emails.getChecker();
 	}
 
@@ -40,134 +40,169 @@ public class EmailModel {
 
 	// 新增emailhost
 	public String AddHost(JSONObject info) {
-		String ownid = "";
-		if (!form.checkRuleEx(info)) {
-			return resultMessage(1, "");
-		}
-		String email = info.get("userid").toString();
-		if (checkEmail(email)) {
-			return resultMessage(2, "");
-		}
-		if (FindEmail(email) != null) {
-			return resultMessage(3, "");
-		}
-		if (info.containsKey("ownid")) {
-			info.remove("ownid");
+		String tips = "";
+		if (info != null) {
+			String ownid = "";
+			if (!form.checkRuleEx(info)) {
+				return resultMessage(1, "");
+			}
+			String email = info.get("userid").toString();
+			if (!checkEmail(email)) {
+				return resultMessage(2, "");
+			}
+			if (FindEmail(email) != null) {
+				return resultMessage(3, "");
+			}
+			if (info.containsKey("ownid")) {
+				info.remove("ownid");
+			}
 			ownid = String.valueOf(appsProxy.appid());
+			System.out.println(ownid);
+			tips = emailhost.addHost(ownid, info.get("userid").toString(), info.get("password").toString(),
+					info.get("smtp").toString(), info.get("pop3").toString());
+			System.out.println(tips);
 		}
-		String tips = emailhost.addHost(ownid, info.get("userid").toString(),
-				info.get("password").toString(), info.get("smtp").toString(),
-				info.get("pop3").toString());
-		return resultMessage(find(tips));
+		if (("").equals(tips)) {
+			return resultMessage(99);
+		}
+		JSONObject object = find(tips);
+		return resultMessage(object);
 	}
 
-	public int delete(String id) {
-		return emailhost.removeHost(id) == true ? 0 : 99;
+	public String delete(String id) {
+		if (id.contains(",")) {
+			return resultMessage(99);
+		}
+		return emailhost.removeHost(id) == true ? resultMessage(0, "删除成功") : resultMessage(99);
 	}
 
-	public int delete(String[] id) {
+	public String delete(String[] id) {
 		emails.or();
 		int len = id.length;
 		for (int i = 0; i < len; i++) {
-			emails.eq("id", id[i]);
+			emails.eq("id", Integer.parseInt(id[i]));
 		}
-		return emails.deleteAll() == id.length ? 0 : 99;
+		long s = emails.deleteAll();
+		return s == len ? resultMessage(0, "删除成功") : resultMessage(99);
 	}
 
-	public int update(String id, JSONObject info) {
-		if (info.containsKey("userid")) {
-			String email = info.get("userid").toString();
-			if (!checkEmail(email)) {
-				return 2;
+	public String update(String id, JSONObject info) {
+		if (info != null) {
+			if (info.containsKey("userid")) {
+				String email = info.get("userid").toString();
+				if (!checkEmail(email)) {
+					return resultMessage(2);
+				}
+			}
+			if (info.containsKey("time")) {
+				info.remove("time");
 			}
 		}
-		if (info.containsKey("time")) {
-			info.remove("time");
-		}
-		return emailhost.editHost(Integer.parseInt(id), info) == true ? 0 : 99;
+		return emailhost.editHost(Integer.parseInt(id), info) == true ? resultMessage(0, "修改成功") : resultMessage(99);
 	}
 
 	@SuppressWarnings("unchecked")
 	public String page(int idx, int pageSize) {
-		JSONArray array = emails.page(idx, pageSize);
-		JSONObject object = new JSONObject();
-		object.put("totalSize",
-				(int) Math.ceil((double) emails.count() / pageSize));
-		object.put("currentPage", idx);
-		object.put("pageSize", pageSize);
-		object.put("data", array);
+		JSONObject object = null;
+		try {
+			object = new JSONObject();
+			JSONArray array = emails.page(idx, pageSize);
+			object.put("totalSize", (int) Math.ceil((double) emails.count() / pageSize));
+			object.put("currentPage", idx);
+			object.put("pageSize", pageSize);
+			object.put("data", array);
+		} catch (Exception e) {
+			nlogger.logout(e);
+			object = null;
+		}
 		return resultMessage(object);
 	}
 
 	@SuppressWarnings("unchecked")
 	public String page(int idx, int pageSize, JSONObject info) {
-		for (Object object2 : info.keySet()) {
-			if (info.containsKey("_id")) {
-				emails.eq("_id", new ObjectId(info.get("_id").toString()));
+		JSONObject object = null;
+		if (info != null) {
+			try {
+				object = new JSONObject();
+				for (Object object2 : info.keySet()) {
+					if (info.containsKey("_id")) {
+						emails.eq("_id", new ObjectId(info.get("_id").toString()));
+					}
+					emails.eq(object2.toString(), info.get(object2.toString()));
+				}
+				JSONArray array = emails.dirty().page(idx, pageSize);
+				object.put("totalSize", (int) Math.ceil((double) emails.count() / pageSize));
+				object.put("currentPage", idx);
+				object.put("pageSize", pageSize);
+				object.put("data", array);
+			} catch (Exception e) {
+				nlogger.logout(e);
+				object = null;
 			}
-			emails.like(object2.toString(), info.get(object2.toString()));
 		}
-		JSONArray array = emails.dirty().page(idx, pageSize);
-		JSONObject object = new JSONObject();
-		object.put("totalSize",
-				(int) Math.ceil((double) emails.count() / pageSize));
-		object.put("currentPage", idx);
-		object.put("pageSize", pageSize);
-		object.put("data", array);
 		return resultMessage(object);
 	}
 
 	// 发送消息，包含字段：发件人信息，收件人邮箱，抄送人，邮件主题，邮件正文，附件内容
 	@SuppressWarnings("unchecked")
-	public int send(String ownid, JSONObject object) {
-		ownid = String.valueOf(appsProxy.appid());
-		String id = search(ownid).get("id").toString();
+	public String send(String ownid, JSONObject object) {
 		boolean flag = false;
-		String CC = "";
-		String subject = "";
-		String content = "";
-		List<String> list = new ArrayList<String>();
-		if (!object.containsKey("to")) {
-			return 4;
+		if (object != null) {
+			String id = "";
+			JSONObject obj = search(ownid);
+			if (obj != null) {
+				id = search(ownid).get("id").toString();
+			}
+			String CC = "";
+			String subject = "";
+			String content = "";
+			List<String> list = new ArrayList<String>();
+			if (!object.containsKey("to")) {
+				return resultMessage(4);
+			}
+			if (!checkEmail(object.get("to").toString())) {
+				return resultMessage(2);
+			}
+			if (object.containsKey("subject")) {
+				subject = object.get("subject").toString();
+			}
+			if (object.containsKey("content")) {
+				content = object.get("content").toString();
+			}
+			if (object.containsKey("cc")) {
+				CC = object.get("cc").toString();
+			}
+			if (object.containsKey("attachments")) {
+				list = (List<String>) object.get("attachments");
+			}
+			try {
+				mail mails = mail.defaultEntity(("").equals(id) ? 0 : Integer.parseInt(id), object.get("to").toString(),
+						CC, subject, content, list);
+				flag = mails.send();
+			} catch (Exception e) {
+				flag = false;
+				nlogger.logout(e);
+			}
 		}
-		if (!checkEmail(object.get("to").toString())) {
-			return 2;
-		}
-		if (object.containsKey("subject")) {
-			subject = object.get("subject").toString();
-		}
-		if (object.containsKey("content")) {
-			content = object.get("content").toString();
-		}
-		if (object.containsKey("cc")) {
-			CC = object.get("cc").toString();
-		}
-		if (object.containsKey("attachments")) {
-			list = (List<String>) object.get("attachments");
-		}
-		mail mails = mail.defaultEntity(Integer.parseInt(id),
-				object.get("to").toString(), CC,subject,content, list);
-		try {
-			flag = mails.send();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-		return flag ? 0 : 99;
+		return flag ? resultMessage(0, "发送成功") : resultMessage(99);
 	}
 
 	// 根据id查找email
 	public JSONObject find(String id) {
-		return emails.eq("id", id).find();
+		JSONObject object = emails.eq("id", Integer.parseInt(id)).find();
+		return object != null ? object : null;
 	}
 
 	// 根据ownid查找email
 	public JSONObject search(String ownid) {
-		return emails.eq("ownid", ownid).find();
+		JSONObject object = emails.eq("ownid", ownid).find();
+		return object != null ? object : null;
 	}
 
-	// 邮箱格式是否存在
+	// 邮箱是否存在
 	public JSONObject FindEmail(String mail) {
-		return emails.eq("userid", "mail").find();
+		JSONObject object = emails.eq("userid", "mail").find();
+		return object != null ? object : null;
 	}
 
 	// 邮箱格式验证
@@ -191,31 +226,32 @@ public class EmailModel {
 	// 将map添加至JSONObject中
 	@SuppressWarnings("unchecked")
 	public JSONObject AddMap(HashMap<String, Object> map, JSONObject object) {
-		if (map.entrySet() != null) {
-			Iterator<Entry<String, Object>> iterator = map.entrySet()
-					.iterator();
-			while (iterator.hasNext()) {
-				Map.Entry<String, Object> entry = (Map.Entry<String, Object>) iterator
-						.next();
-				if (!object.containsKey(entry.getKey())) {
-					object.put(entry.getKey(), entry.getValue());
+		if (object != null) {
+			if (map.entrySet() != null) {
+				Iterator<Entry<String, Object>> iterator = map.entrySet().iterator();
+				while (iterator.hasNext()) {
+					Map.Entry<String, Object> entry = (Map.Entry<String, Object>) iterator.next();
+					if (!object.containsKey(entry.getKey())) {
+						object.put(entry.getKey(), entry.getValue());
+					}
 				}
 			}
 		}
 		return object;
 	}
 
+	private String resultMessage(int num) {
+		return resultMessage(num, "");
+	}
+
 	@SuppressWarnings("unchecked")
 	private String resultMessage(JSONObject object) {
+		if (object == null) {
+			object = new JSONObject();
+		}
 		_obj.put("records", object);
 		return resultMessage(0, _obj.toString());
 	}
-
-	// @SuppressWarnings("unchecked")
-	// private String resultMessage(JSONArray array) {
-	// _obj.put("records", array);
-	// return resultMessage(0, _obj.toString());
-	// }
 
 	public String resultMessage(int num, String message) {
 		String msg = "";
