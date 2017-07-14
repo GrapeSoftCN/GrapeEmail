@@ -11,6 +11,7 @@ import org.bson.types.ObjectId;
 import org.json.simple.JSONArray;
 import org.json.simple.JSONObject;
 
+import JGrapeSystem.jGrapeFW_Message;
 import apps.appsProxy;
 import check.formHelper;
 import check.formHelper.formdef;
@@ -18,7 +19,6 @@ import database.DBHelper;
 import email.emailhost;
 import email.mail;
 import nlogger.nlogger;
-import esayhelper.jGrapeFW_Message;
 
 public class EmailModel {
 	private static DBHelper emails;
@@ -132,6 +132,7 @@ public class EmailModel {
 				}
 				JSONArray array = emails.dirty().page(idx, pageSize);
 				object.put("totalSize", (int) Math.ceil((double) emails.count() / pageSize));
+				emails.clear();
 				object.put("currentPage", idx);
 				object.put("pageSize", pageSize);
 				object.put("data", array);
