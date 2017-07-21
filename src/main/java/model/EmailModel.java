@@ -21,17 +21,13 @@ import email.mail;
 import nlogger.nlogger;
 
 public class EmailModel {
-	private static DBHelper emails;
-	private static formHelper form;
+	private DBHelper emails;
+	private formHelper form;
 	private JSONObject _obj = new JSONObject();
 
-	static {
-		System.out.println(appsProxy.configValue());
+	public EmailModel() {
 		emails = new DBHelper(appsProxy.configValue().get("db").toString(), "emailhost");
 		form = emails.getChecker();
-	}
-
-	public EmailModel() {
 		form.putRule("smtp", formdef.notNull);
 		form.putRule("pop3", formdef.notNull);
 		form.putRule("userid", formdef.notNull);
@@ -181,8 +177,8 @@ public class EmailModel {
 						CC, subject, content, list);
 				flag = mails.send();
 			} catch (Exception e) {
-				flag = false;
 				nlogger.logout(e);
+				flag = false;
 			}
 		}
 		return flag ? resultMessage(0, "发送成功") : resultMessage(99);
